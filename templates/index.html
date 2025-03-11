@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Simulasi Reproduksi Digital - Pengembangan Lanjut</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: #f8f9fa;
+      padding-top: 20px;
+    }
+    .canvas-container {
+      position: relative;
+      margin: auto;
+      border: 2px solid #343a40;
+      background: #ffffff;
+      box-shadow: 0px 4px 8px rgba(0,0,0,0.1);
+    }
+    #simCanvas {
+      display: block;
+      margin: auto;
+      transition: opacity 0.3s ease;
+    }
+    .control-panel, .stats-panel, .chart-panel, .history-panel {
+      margin-top: 30px;
+    }
+    .slider-label {
+      font-weight: bold;
+    }
+    .card {
+      box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+    }
+    .input-group-text {
+      min-width: 80px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="mb-4">
+      <h1 class="text-center text-primary">Simulasi Reproduksi Digital</h1>
+      <p class="text-center">Pengembangan Lanjut dengan Statistik, Prediksi ML, dan Mode Eksperimen</p>
+    </header>
+    
+    <!-- Canvas simulasi -->
+    <div class="canvas-container mb-4" style="width: 520px; height: 520px;">
+      <canvas id="simCanvas" width="500" height="500"></canvas>
+    </div>
+    
+    <!-- Tombol Pause/Play dan Reset -->
+    <div class="d-flex justify-content-center mb-4">
+      <button id="pauseBtn" class="btn btn-warning mx-2">Pause</button>
+      <button id="resetBtn" class="btn btn-danger mx-2">Reset</button>
+    </div>
+    
+    <!-- Panel Preset Mode -->
+    <div class="control-panel card p-3">
+      <h4 class="mb-3">Pengaturan Simulasi</h4>
+      
+      <!-- Preset Mode -->
+      <div class="form-group row">
+        <label for="presetMode" class="col-sm-4 col-form-label slider-label">Preset Mode:</label>
+        <div class="col-sm-8">
+          <select id="presetMode" class="form-control">
+            <option value="default">Default</option>
+            <option value="Mutasi Cepat">Mutasi Cepat</option>
+            <option value="Spesies Dominan">Spesies Dominan</option>
+            <option value="Seleksi Ketat">Seleksi Ketat</option>
+          </select>
+          <button id="applyPreset" class="btn btn-info btn-sm mt-2">Apply Preset</button>
+        </div>
+      </div>
+      
+      <!-- Mutation Rate Control -->
+      <div class="form-group row align-items-center">
+        <label for="mutationRate" class="col-sm-4 col-form-label slider-label">Mutation Rate:</label>
+        <div class="col-sm-4">
+          <input type="range" class="form-control-range" id="mutationRate" min="0" max="0.1" step="0.001" value="0.01">
+        </div>
+        <div class="col-sm-4">
+          <div class="input-group">
+            <input type="number" class="form-control" id="mutationRateNum" min="0" max="0.1" step="0.001" value="0.01">
+            <div class="input-group-append">
+              <span class="input-group-text">rate</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Simulation Delay Control -->
+      <div class="form-group row align-items-center">
+        <label for="simDelay" class="col-sm-4 col-form-label slider-label">Simulation Delay (s):</label>
+        <div class="col-sm-4">
+          <input type="range" class="form-control-range" id="simDelay" min="0.01" max="3" step="0.01" value="0.1">
+        </div>
+        <div class="col-sm-4">
+          <div class="input-group">
+            <input type="number" class="form-control" id="simDelayNum" min="0.01" max="3" step="0.01" value="0.1">
+            <div class="input-group-append">
+              <span class="input-group-text">detik</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Panel Statistik -->
+    <div class="stats-panel card p-3 mt-4">
+      <h4 class="mb-3">Statistik Simulasi</h4>
+      <p>Generation: <span id="generation">0</span></p>
+      <p>Average Fitness: <span id="avgFitness">0</span></p>
+      <p>Best Fitness: <span id="bestFitness">0</span></p>
+      <div class="mt-3">
+        <h5>Prediksi Average Fitness (ML)</h5>
+        <p>Prediksi untuk generation selanjutnya: <span id="mlPrediction">-</span></p>
+      </div>
+    </div>
+    
+    <!-- Panel Histogram -->
+    <div class="chart-panel card p-3 mt-4">
+      <h4 class="mb-3">Histogram Distribusi Fitness</h4>
+      <canvas id="histChart" width="400" height="200"></canvas>
+    </div>
+    
+    <!-- Panel Evolusi History (Line Chart) -->
+    <div class="history-panel card p-3 mt-4">
+      <h4 class="mb-3">Evolusi History (Average Fitness vs Generation)</h4>
+      <canvas id="lineChart" width="400" height="200"></canvas>
+    </div>
+    
+    <!-- Modal untuk menampilkan detail sel -->
+    <div class="modal fade" id="cellModal" tabindex="-1" role="dialog" aria-labelledby="cellModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cellModalLabel">Detail Sel</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p><strong>Koordinat:</strong> (<span id="cellX"></span>, <span id="cellY"></span>)</p>
+            <p><strong>Genotype:</strong> <span id="cellGenotype"></span></p>
+            <p><strong>Species:</strong> <span id="cellSpecies"></span></p>
+            <p><strong>Fitness:</strong> <span id="cellFitness"></span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+  
+  <!-- Script JavaScript -->
+  <script>
+    const GRID_WIDTH = 50;
+    const GRID_HEIGHT = 50;
+    const CELL_SIZE = 10;
+    const GENOTYPE_LENGTH = 8;
+
+    const canvas = document.getElementById("simCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Fungsi mapping nilai fitness (0-8) ke warna gradient (dengan HSL: dari biru ke hijau ke merah)
+    function getGradientColor(fitnessValue) {
+      let ratio = fitnessValue / GENOTYPE_LENGTH; // 0 hingga 1
+      // Hue dari 240 (biru) ke 0 (merah)
+      let hue = (1 - ratio) * 240;
+      return `hsl(${hue}, 100%, 50%)`;
+    }
+
+    // Setup Chart.js untuk histogram
+    const histCtx = document.getElementById("histChart").getContext("2d");
+    let histChart = new Chart(histCtx, {
+      type: 'bar',
+      data: {
+        labels: Array.from({length: GENOTYPE_LENGTH + 1}, (_, i) => i.toString()),
+        datasets: [{
+          label: 'Fitness Distribution',
+          data: Array(GENOTYPE_LENGTH + 1).fill(0),
+          backgroundColor: 'rgba(255, 99, 132, 0.5)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+    // Setup Chart.js untuk line chart (Evolusi History)
+    const lineCtx = document.getElementById("lineChart").getContext("2d");
+    let lineChart = new Chart(lineCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Average Fitness',
+          data: [],
+          borderColor: 'rgba(75, 192, 192, 1)',
+          fill: false
+        }]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: 'Generation' } },
+          y: { title: { display: true, text: 'Average Fitness' }, beginAtZero: true }
+        }
+      }
+    });
+
+    async function fetchGrid() {
+      try {
+        let response = await fetch('/api/grid');
+        return await response.json();
+      } catch (error) {
+        console.error("Error fetching grid:", error);
+        return null;
+      }
+    }
+
+    async function fetchStats() {
+      try {
+        let response = await fetch('/api/stats');
+        return await response.json();
+      } catch (error) {
+        console.error("Error fetching stats:", error);
+        return null;
+      }
+    }
+    
+    async function fetchMLPrediction() {
+      try {
+        let response = await fetch('/api/prediction');
+        return await response.json();
+      } catch (error) {
+        console.error("Error fetching ML prediction:", error);
+        return null;
+      }
+    }
+    
+    async function fetchHistogram() {
+      try {
+        let response = await fetch('/api/histogram');
+        return (await response.json()).histogram;
+      } catch (error) {
+        console.error("Error fetching histogram:", error);
+        return null;
+      }
+    }
+    
+    async function fetchHistory() {
+      try {
+        let response = await fetch('/api/history');
+        return await response.json();
+      } catch (error) {
+        console.error("Error fetching history:", error);
+        return [];
+      }
+    }
+
+    // Menggambar grid ke dalam canvas dengan efek fade (animasi transisi)
+    function drawGrid(grid) {
+      // Efek fade dengan menggambar kotak semi-transparan
+      ctx.fillStyle = "rgba(248,249,250,0.5)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          let cell = grid[y][x];
+          let fit = 0;
+          for (let bit of cell.genotype) {
+            if (bit === 1) fit++;
+          }
+          // Terapkan faktor spesies (jika species 1, gunakan faktor 0.9)
+          let species_factor = (cell.species === 0) ? 1.0 : 0.9;
+          fit = fit * species_factor;
+          ctx.fillStyle = getGradientColor(fit);
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
+      }
+    }
+
+    async function updateGrid() {
+      let grid = await fetchGrid();
+      if (grid) drawGrid(grid);
+    }
+
+    async function updateStats() {
+      let stats = await fetchStats();
+      if (stats) {
+        document.getElementById("generation").innerText = stats.generation;
+        document.getElementById("avgFitness").innerText = stats.average_fitness.toFixed(2);
+        document.getElementById("bestFitness").innerText = stats.best_fitness;
+      }
+    }
+    
+    async function updateMLPrediction() {
+      let mlData = await fetchMLPrediction();
+      if (mlData && mlData.prediction !== null) {
+        document.getElementById("mlPrediction").innerText = mlData.prediction.toFixed(2);
+      } else {
+        document.getElementById("mlPrediction").innerText = "Not enough data";
+      }
+    }
+    
+    async function updateHistogram() {
+      let histData = await fetchHistogram();
+      if (histData) {
+        histChart.data.datasets[0].data = histData;
+        histChart.update();
+      }
+    }
+    
+    async function updateLineChart() {
+      let historyData = await fetchHistory();
+      if (historyData.length > 0) {
+        lineChart.data.labels = historyData.map(d => d.generation);
+        lineChart.data.datasets[0].data = historyData.map(d => d.average_fitness);
+        lineChart.update();
+      }
+    }
+
+    // Update secara berkala setiap 100 ms
+    setInterval(() => {
+      updateGrid();
+      updateStats();
+      updateMLPrediction();
+      updateHistogram();
+      updateLineChart();
+    }, 100);
+
+    // Fungsi untuk mengirim parameter baru ke server
+    async function updateParameters() {
+      const mutationRateVal = document.getElementById("mutationRate").value;
+      const simDelayVal = document.getElementById("simDelay").value;
+      // Sinkronisasi slider dan input angka
+      document.getElementById("mutationRate").value = mutationRateVal;
+      document.getElementById("mutationRateNum").value = mutationRateVal;
+      document.getElementById("simDelay").value = simDelayVal;
+      document.getElementById("simDelayNum").value = simDelayVal;
+      
+      try {
+        await fetch('/api/set_parameters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mutation_rate: mutationRateVal, simulation_delay: simDelayVal })
+        });
+      } catch (error) {
+        console.error("Error updating parameters:", error);
+      }
+    }
+
+    // Fungsi untuk menerapkan preset mode
+    async function applyPreset() {
+      const preset = document.getElementById("presetMode").value;
+      try {
+        await fetch('/api/set_preset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preset: preset })
+        });
+        // Setelah preset diterapkan, lakukan reset simulasi agar parameter baru berpengaruh
+        await resetSimulation();
+      } catch (error) {
+        console.error("Error applying preset:", error);
+      }
+    }
+
+    // Fungsi toggle pause/play
+    async function togglePause() {
+      try {
+        let response = await fetch('/api/toggle_pause', { method: 'POST' });
+        let data = await response.json();
+        document.getElementById("pauseBtn").innerText = data.paused ? "Play" : "Pause";
+      } catch (error) {
+        console.error("Error toggling pause:", error);
+      }
+    }
+
+    // Fungsi reset simulasi
+    async function resetSimulation() {
+      try {
+        await fetch('/api/reset', { method: 'POST' });
+      } catch (error) {
+        console.error("Error resetting simulation:", error);
+      }
+    }
+
+    // Event listener untuk slider dan input angka
+    document.getElementById("mutationRate").addEventListener("input", updateParameters);
+    document.getElementById("mutationRateNum").addEventListener("input", updateParameters);
+    document.getElementById("simDelay").addEventListener("input", updateParameters);
+    document.getElementById("simDelayNum").addEventListener("input", updateParameters);
+    document.getElementById("applyPreset").addEventListener("click", applyPreset);
+    document.getElementById("pauseBtn").addEventListener("click", togglePause);
+    document.getElementById("resetBtn").addEventListener("click", resetSimulation);
+
+    // Event listener untuk klik pada canvas (menampilkan detail sel)
+    canvas.addEventListener("click", async function(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((event.clientX - rect.left) / CELL_SIZE);
+      const y = Math.floor((event.clientY - rect.top) / CELL_SIZE);
+      let grid = await fetchGrid();
+      if (grid && grid[y] && grid[y][x]) {
+        const cell = grid[y][x];
+        let fit = 0;
+        cell.genotype.forEach(bit => { if(bit===1) fit++; });
+        // Terapkan faktor spesies
+        let speciesFactor = (cell.species === 0) ? 1.0 : 0.9;
+        fit = fit * speciesFactor;
+        document.getElementById("cellX").innerText = x;
+        document.getElementById("cellY").innerText = y;
+        document.getElementById("cellGenotype").innerText = cell.genotype.join("");
+        document.getElementById("cellSpecies").innerText = cell.species;
+        document.getElementById("cellFitness").innerText = fit;
+        $('#cellModal').modal('show');
+      }
+    });
+  </script>
+  
+  <!-- Bootstrap JS dan dependencies -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
